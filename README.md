@@ -2,6 +2,20 @@
 
 一个只读的 Chromium Markdown 阅读器扩展：在地址栏打开本地或远程 `.md` 链接就会自动渲染，不包含文件管理、编辑器或上传功能。
 
+## 预览
+
+浅色主题：
+
+![浅色主题](screenshots/light.png)
+
+深色主题与 Mermaid：
+
+![深色主题与 Mermaid](screenshots/dark-mermaid.png)
+
+移动端：
+
+<p align="center"><img src="screenshots/mobile.png" alt="移动端布局" width="330"></p>
+
 ## 功能
 
 - **地址栏直达**：浏览器导航到本地 `/home/.../README.md`（或 `file:///...`）以及 `https://.../README.md` 时，自动交给内置查看器渲染。
@@ -89,7 +103,7 @@ https://example.com/README.md#ry-raw
 
 ## 配色
 
-色彩 token 参考同目录的 [`../sapgir`](../sapgir)：
+色彩 token 参考 [`sapgir`](https://github.com/chenmingjun2/sapgir)：
 
 | Token | 浅色 | 深色 |
 | --- | --- | --- |
@@ -132,6 +146,7 @@ ry-md-reader/
 ├── viewer.js              # 拉取、渲染、Mermaid、主题、复制
 ├── theme-init.js          # 首屏前应用已保存主题
 ├── assets/                # 图标
+├── screenshots/           # README 预览截图
 ├── fonts/                 # MiSans + JetBrains Mono
 ├── vendor/                # marked / DOMPurify / highlight.js / Mermaid
 ├── LICENSES/              # 第三方许可证全文

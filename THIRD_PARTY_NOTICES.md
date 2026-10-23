@@ -29,7 +29,8 @@ text rendering inside this extension and are not sold or licensed separately.
 
 ## Color reference
 
-The light/dark color tokens are adapted from the local `../sapgir` project's
+The light/dark color tokens are adapted from the
+[`sapgir`](https://github.com/chenmingjun2/sapgir) project's
 `styles/app.css`. No Sapgir source code is bundled; only the palette values
 (brand blue `#4d6bfe`, neutral surfaces, borders and text colors) are reused.
 
