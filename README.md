@@ -24,6 +24,7 @@
 - **Mermaid**：` ```mermaid ` 代码块渲染为 SVG 图表，支持 flowchart、sequence、gantt 等。
 - **代码高亮**：highlight.js，内置常用语言。
 - **Markdown 全量排版**：GFM 表格、任务列表、引用、图片、相对链接解析。
+- **图片放大预览**：点击正文图片打开全屏预览，支持滚轮 / 按钮缩放、拖拽平移、双击切换、`Esc` 关闭，并可打开原图。
 - **明暗主题**：仅浅色 / 深色两套，右上角切换并记住选择。
 - **字体**：中文 MiSans Medium，英文与代码 JetBrains Mono（全部本地打包，不请求字体 CDN）。
 - **GitHub / GitLab**：`github.com/.../blob/...README.md` 和 GitLab 的 `/-/blob/` 页面会尽量自动转换为 Raw 内容。

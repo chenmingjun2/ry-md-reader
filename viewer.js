@@ -34,6 +34,18 @@
     changeBtn: document.getElementById('change-btn'),
     doc: document.getElementById('doc'),
     toast: document.getElementById('toast'),
+    lightbox: document.getElementById('lightbox'),
+    lightboxStage: document.getElementById('lightbox-stage'),
+    lightboxImage: document.getElementById('lightbox-image'),
+    lightboxLoading: document.getElementById('lightbox-loading'),
+    lightboxAlt: document.getElementById('lightbox-alt'),
+    lightboxDim: document.getElementById('lightbox-dim'),
+    lightboxOpen: document.getElementById('lightbox-open'),
+    lightboxClose: document.getElementById('lightbox-close'),
+    zoomOut: document.getElementById('zoom-out'),
+    zoomReset: document.getElementById('zoom-reset'),
+    zoomIn: document.getElementById('zoom-in'),
+    zoomLabel: document.getElementById('zoom-label'),
   };
 
   let theme = document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
@@ -44,6 +56,18 @@
   let toastTimer = 0;
   let progressRaf = 0;
   let docReady = false;
+
+  let lightboxScale = 1;
+  let lightboxX = 0;
+  let lightboxY = 0;
+  let lightboxLoadToken = 0;
+  let lightboxLastFocus = null;
+  let lightboxDragging = false;
+  let lightboxDragMoved = false;
+  let lightboxDragStartX = 0;
+  let lightboxDragStartY = 0;
+  let lightboxDragOriginX = 0;
+  let lightboxDragOriginY = 0;
 
   class ViewError extends Error {
     constructor(message, hint = '') {
@@ -177,6 +201,264 @@
     progressRaf = requestAnimationFrame(() => {
       progressRaf = 0;
       updateProgress();
+    });
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* Image lightbox                                                   */
+  /* ---------------------------------------------------------------- */
+
+  const LIGHTBOX_MIN_ZOOM = 1;
+  const LIGHTBOX_MAX_ZOOM = 6;
+
+  function lightboxIsOpen() {
+    return !dom.lightbox.hidden;
+  }
+
+  function lightboxPanLimits() {
+    const style = getComputedStyle(dom.lightboxStage);
+    const availableWidth = Math.max(
+      0,
+      dom.lightboxStage.clientWidth -
+        (Number.parseFloat(style.paddingLeft) || 0) -
+        (Number.parseFloat(style.paddingRight) || 0)
+    );
+    const availableHeight = Math.max(
+      0,
+      dom.lightboxStage.clientHeight -
+        (Number.parseFloat(style.paddingTop) || 0) -
+        (Number.parseFloat(style.paddingBottom) || 0)
+    );
+    return {
+      x: Math.max(0, (dom.lightboxImage.clientWidth * lightboxScale - availableWidth) / 2),
+      y: Math.max(0, (dom.lightboxImage.clientHeight * lightboxScale - availableHeight) / 2),
+    };
+  }
+
+  function clampLightboxPan() {
+    const limits = lightboxPanLimits();
+    lightboxX = Math.min(limits.x, Math.max(-limits.x, lightboxX));
+    lightboxY = Math.min(limits.y, Math.max(-limits.y, lightboxY));
+  }
+
+  function applyLightboxTransform() {
+    dom.lightboxImage.style.transform = `translate3d(${lightboxX}px, ${lightboxY}px, 0) scale(${lightboxScale})`;
+    dom.zoomLabel.textContent = `${Math.round(lightboxScale * 100)}%`;
+  }
+
+  function resetLightboxZoom() {
+    lightboxScale = 1;
+    lightboxX = 0;
+    lightboxY = 0;
+    applyLightboxTransform();
+  }
+
+  function zoomLightbox(next) {
+    const target = Math.min(
+      LIGHTBOX_MAX_ZOOM,
+      Math.max(LIGHTBOX_MIN_ZOOM, Math.round(next * 100) / 100)
+    );
+    if (target <= LIGHTBOX_MIN_ZOOM) {
+      resetLightboxZoom();
+      return;
+    }
+    lightboxScale = target;
+    clampLightboxPan();
+    applyLightboxTransform();
+  }
+
+  function openLightbox(image) {
+    if (!image) return;
+    const src = image.currentSrc || image.src;
+    if (!src) return;
+
+    const token = ++lightboxLoadToken;
+    lightboxLastFocus = image;
+    lightboxScale = 1;
+    lightboxX = 0;
+    lightboxY = 0;
+    lightboxDragging = false;
+    lightboxDragMoved = false;
+
+    dom.lightboxAlt.textContent = image.alt || '图片预览';
+    dom.lightboxDim.textContent =
+      image.naturalWidth && image.naturalHeight
+        ? `${image.naturalWidth} × ${image.naturalHeight}`
+        : '';
+    dom.lightboxOpen.href = src;
+    dom.lightboxImage.alt = image.alt || '图片预览';
+    dom.lightboxImage.hidden = true;
+    dom.lightboxImage.style.transform = '';
+    dom.lightboxLoading.hidden = false;
+    dom.lightboxLoading.textContent = '正在加载图片…';
+
+    const reveal = () => {
+      if (token !== lightboxLoadToken) return;
+      dom.lightboxLoading.hidden = true;
+      dom.lightboxImage.hidden = false;
+      dom.lightboxDim.textContent =
+        dom.lightboxImage.naturalWidth && dom.lightboxImage.naturalHeight
+          ? `${dom.lightboxImage.naturalWidth} × ${dom.lightboxImage.naturalHeight}`
+          : '';
+      resetLightboxZoom();
+    };
+
+    dom.lightboxImage.onload = reveal;
+    dom.lightboxImage.onerror = () => {
+      if (token !== lightboxLoadToken) return;
+      dom.lightboxImage.hidden = true;
+      dom.lightboxLoading.hidden = false;
+      dom.lightboxLoading.textContent = '图片加载失败';
+    };
+
+    dom.lightbox.hidden = false;
+    document.body.classList.add('lightbox-open');
+    dom.zoomLabel.textContent = '100%';
+
+    dom.lightboxImage.src = src;
+    if (dom.lightboxImage.complete && dom.lightboxImage.naturalWidth) reveal();
+
+    dom.lightboxClose.focus({ preventScroll: true });
+  }
+
+  function closeLightbox() {
+    if (!lightboxIsOpen()) return;
+
+    lightboxLoadToken += 1;
+    dom.lightbox.hidden = true;
+    document.body.classList.remove('lightbox-open');
+    dom.lightboxImage.onload = null;
+    dom.lightboxImage.onerror = null;
+    dom.lightboxImage.hidden = true;
+    dom.lightboxImage.removeAttribute('src');
+    dom.lightboxImage.style.transform = '';
+    dom.lightboxStage.classList.remove('is-dragging');
+
+    lightboxScale = 1;
+    lightboxX = 0;
+    lightboxY = 0;
+    lightboxDragging = false;
+    lightboxDragMoved = false;
+
+    if (lightboxLastFocus && document.contains(lightboxLastFocus)) {
+      if (!lightboxLastFocus.hasAttribute('tabindex')) {
+        lightboxLastFocus.setAttribute('tabindex', '-1');
+      }
+      lightboxLastFocus.focus({ preventScroll: true });
+    }
+    lightboxLastFocus = null;
+  }
+
+  function bindLightboxEvents() {
+    dom.lightboxClose.addEventListener('click', closeLightbox);
+
+    dom.lightbox.addEventListener('click', (event) => {
+      if (event.target === dom.lightbox) closeLightbox();
+    });
+
+    dom.lightboxStage.addEventListener('click', (event) => {
+      if (lightboxDragMoved) {
+        lightboxDragMoved = false;
+        return;
+      }
+      if (event.target === dom.lightboxStage) closeLightbox();
+    });
+
+    dom.zoomIn.addEventListener('click', () => {
+      zoomLightbox(lightboxScale + 0.25);
+    });
+
+    dom.zoomOut.addEventListener('click', () => {
+      zoomLightbox(lightboxScale - 0.25);
+    });
+
+    dom.zoomReset.addEventListener('click', resetLightboxZoom);
+
+    dom.lightboxImage.addEventListener('dblclick', (event) => {
+      event.preventDefault();
+      if (lightboxScale > 1.01) resetLightboxZoom();
+      else zoomLightbox(2.2);
+    });
+
+    dom.lightboxStage.addEventListener(
+      'wheel',
+      (event) => {
+        if (!lightboxIsOpen()) return;
+        event.preventDefault();
+        zoomLightbox(lightboxScale + (event.deltaY < 0 ? 0.25 : -0.25));
+      },
+      { passive: false }
+    );
+
+    dom.lightboxStage.addEventListener('pointerdown', (event) => {
+      if (!lightboxIsOpen() || event.button !== 0 || lightboxScale <= 1.001) return;
+
+      lightboxDragging = true;
+      lightboxDragMoved = false;
+      lightboxDragStartX = event.clientX;
+      lightboxDragStartY = event.clientY;
+      lightboxDragOriginX = lightboxX;
+      lightboxDragOriginY = lightboxY;
+      dom.lightboxStage.classList.add('is-dragging');
+      try {
+        dom.lightboxStage.setPointerCapture(event.pointerId);
+      } catch {
+        // Pointer capture is best-effort.
+      }
+    });
+
+    dom.lightboxStage.addEventListener('pointermove', (event) => {
+      if (!lightboxDragging) return;
+
+      const dx = event.clientX - lightboxDragStartX;
+      const dy = event.clientY - lightboxDragStartY;
+      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) lightboxDragMoved = true;
+
+      lightboxX = lightboxDragOriginX + dx;
+      lightboxY = lightboxDragOriginY + dy;
+      clampLightboxPan();
+      applyLightboxTransform();
+    });
+
+    const endDrag = (event) => {
+      if (!lightboxDragging) return;
+      lightboxDragging = false;
+      dom.lightboxStage.classList.remove('is-dragging');
+      if (dom.lightboxStage.hasPointerCapture(event.pointerId)) {
+        dom.lightboxStage.releasePointerCapture(event.pointerId);
+      }
+      clampLightboxPan();
+      applyLightboxTransform();
+      window.setTimeout(() => {
+        lightboxDragMoved = false;
+      }, 0);
+    };
+
+    dom.lightboxStage.addEventListener('pointerup', endDrag);
+    dom.lightboxStage.addEventListener('pointercancel', endDrag);
+
+    document.addEventListener('keydown', (event) => {
+      if (!lightboxIsOpen()) return;
+
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        closeLightbox();
+      } else if (event.key === '+' || event.key === '=') {
+        event.preventDefault();
+        zoomLightbox(lightboxScale + 0.25);
+      } else if (event.key === '-' || event.key === '_') {
+        event.preventDefault();
+        zoomLightbox(lightboxScale - 0.25);
+      } else if (event.key === '0') {
+        event.preventDefault();
+        resetLightboxZoom();
+      }
+    });
+
+    window.addEventListener('resize', () => {
+      if (!lightboxIsOpen() || !dom.lightboxImage.naturalWidth) return;
+      clampLightboxPan();
+      applyLightboxTransform();
     });
   }
 
@@ -998,6 +1280,13 @@
     });
 
     dom.doc.addEventListener('click', async (event) => {
+      const image = event.target.closest('img');
+      if (image && dom.doc.contains(image)) {
+        event.preventDefault();
+        openLightbox(image);
+        return;
+      }
+
       const button = event.target.closest('.copy-btn');
       if (!button || !dom.doc.contains(button)) return;
 
@@ -1024,6 +1313,8 @@
 
     window.addEventListener('scroll', queueProgress, { passive: true });
     window.addEventListener('resize', queueProgress, { passive: true });
+
+    bindLightboxEvents();
   }
 
   /* ---------------------------------------------------------------- */
