@@ -39,6 +39,23 @@
     </button>
   </header>
 
+  <aside class="toc" id="toc" aria-label="目录" hidden>
+    <div class="toc-head">
+      <span class="toc-title">目录</span>
+      <button class="toc-collapse" id="toc-collapse" type="button" title="收起目录" aria-label="收起目录">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+      </button>
+    </div>
+    <nav class="toc-list" id="toc-list"></nav>
+  </aside>
+
+  <div class="toc-backdrop" id="toc-backdrop" hidden></div>
+
+  <button class="toc-fab" id="toc-fab" type="button" title="展开目录" aria-label="展开目录" hidden>
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg>
+    <span>目录</span>
+  </button>
+
   <main class="page">
     <section class="landing" id="landing" hidden>
       <div class="landing-glow" aria-hidden="true"></div>

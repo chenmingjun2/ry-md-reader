@@ -10,6 +10,7 @@
   'use strict';
 
   const THEME_KEY = 'ry-md-theme';
+  const TOC_COLLAPSED_KEY = 'ry-md-toc-collapsed';
   const FETCH_TIMEOUT = 30000;
 
   const dom = {
@@ -34,6 +35,11 @@
     changeBtn: document.getElementById('change-btn'),
     doc: document.getElementById('doc'),
     toast: document.getElementById('toast'),
+    toc: document.getElementById('toc'),
+    tocList: document.getElementById('toc-list'),
+    tocCollapse: document.getElementById('toc-collapse'),
+    tocFab: document.getElementById('toc-fab'),
+    tocBackdrop: document.getElementById('toc-backdrop'),
     lightbox: document.getElementById('lightbox'),
     lightboxStage: document.getElementById('lightbox-stage'),
     lightboxImage: document.getElementById('lightbox-image'),
@@ -68,6 +74,13 @@
   let lightboxDragStartY = 0;
   let lightboxDragOriginX = 0;
   let lightboxDragOriginY = 0;
+
+  let tocHeadings = [];
+  let tocLinks = [];
+  let tocActiveId = '';
+  let tocReady = false;
+  let tocCollapsed = false;
+  let tocDrawerOpen = false;
 
   class ViewError extends Error {
     constructor(message, hint = '') {
@@ -201,6 +214,7 @@
     progressRaf = requestAnimationFrame(() => {
       progressRaf = 0;
       updateProgress();
+      updateTocActive();
     });
   }
 
@@ -463,6 +477,195 @@
   }
 
   /* ---------------------------------------------------------------- */
+  /* Floating table of contents                                       */
+  /* ---------------------------------------------------------------- */
+
+  function initTocPreference() {
+    try {
+      tocCollapsed = localStorage.getItem(TOC_COLLAPSED_KEY) === '1';
+    } catch {
+      tocCollapsed = false;
+    }
+  }
+
+  function clearToc() {
+    tocHeadings = [];
+    tocLinks = [];
+    tocActiveId = '';
+    tocReady = false;
+    tocDrawerOpen = false;
+    dom.tocList.textContent = '';
+    dom.toc.hidden = true;
+    dom.tocFab.hidden = true;
+    dom.tocBackdrop.hidden = true;
+  }
+
+  function tocIsNarrow() {
+    return window.matchMedia('(max-width: 1279px)').matches;
+  }
+
+  function applyTocVisibility() {
+    const hasHeadings = tocReady && tocHeadings.length >= 2;
+    if (!hasHeadings) {
+      dom.toc.hidden = true;
+      dom.tocFab.hidden = true;
+      dom.tocBackdrop.hidden = true;
+      return;
+    }
+
+    if (tocIsNarrow()) {
+      dom.toc.hidden = !tocDrawerOpen;
+      dom.tocFab.hidden = tocDrawerOpen;
+      dom.tocBackdrop.hidden = !tocDrawerOpen;
+      return;
+    }
+
+    dom.toc.hidden = tocCollapsed;
+    dom.tocFab.hidden = !tocCollapsed;
+    dom.tocBackdrop.hidden = true;
+  }
+
+  function buildToc() {
+    tocHeadings = Array.from(dom.doc.querySelectorAll('h1, h2, h3, h4, h5, h6')).filter(
+      (heading) => (heading.textContent || '').trim() && heading.getClientRects().length > 0
+    );
+    tocLinks = [];
+    tocActiveId = '';
+    dom.tocList.textContent = '';
+
+    if (tocHeadings.length < 2) {
+      tocReady = false;
+      applyTocVisibility();
+      return;
+    }
+
+    const levels = tocHeadings.map((heading) => Number.parseInt(heading.tagName.slice(1), 10));
+    const minLevel = Math.min(...levels);
+
+    tocHeadings.forEach((heading) => {
+      const level = Math.min(6, Math.max(1, Number.parseInt(heading.tagName.slice(1), 10) - minLevel + 1));
+      const link = document.createElement('a');
+      link.className = 'toc-link';
+      link.href = `#${encodeURIComponent(heading.id)}`;
+      link.dataset.id = heading.id;
+      link.dataset.level = String(level);
+      link.textContent = heading.textContent.trim();
+      link.title = heading.textContent.trim();
+      dom.tocList.appendChild(link);
+      tocLinks.push(link);
+    });
+
+    tocReady = true;
+    applyTocVisibility();
+    updateTocActive(true);
+  }
+
+  function setTocActive(id, force = false) {
+    if (!id) return;
+    if (!force && id === tocActiveId) return;
+    tocActiveId = id;
+
+    let activeLink = null;
+    tocLinks.forEach((link) => {
+      const active = link.dataset.id === id;
+      link.classList.toggle('active', active);
+      if (active) {
+        link.setAttribute('aria-current', 'location');
+        activeLink = link;
+      } else {
+        link.removeAttribute('aria-current');
+      }
+    });
+
+    if (!activeLink || dom.toc.hidden) return;
+
+    const listRect = dom.tocList.getBoundingClientRect();
+    const linkRect = activeLink.getBoundingClientRect();
+    if (linkRect.top < listRect.top) {
+      dom.tocList.scrollTop -= listRect.top - linkRect.top + 4;
+    } else if (linkRect.bottom > listRect.bottom) {
+      dom.tocList.scrollTop += linkRect.bottom - listRect.bottom + 4;
+    }
+  }
+
+  function updateTocActive(force = false) {
+    if (!tocReady || !tocHeadings.length) return;
+
+    const topbarHeight =
+      Number.parseFloat(
+        getComputedStyle(document.documentElement).getPropertyValue('--topbar-h')
+      ) || 58;
+    const threshold = topbarHeight + 24;
+
+    let index = 0;
+    for (let i = 0; i < tocHeadings.length; i += 1) {
+      if (tocHeadings[i].getBoundingClientRect().top <= threshold) index = i;
+      else break;
+    }
+
+    const atBottom =
+      window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 2;
+    if (atBottom) index = tocHeadings.length - 1;
+
+    setTocActive(tocHeadings[index].id, force);
+  }
+
+  function setTocCollapsed(collapsed) {
+    tocCollapsed = collapsed;
+    try {
+      localStorage.setItem(TOC_COLLAPSED_KEY, collapsed ? '1' : '0');
+    } catch {
+      // Ignore storage failures.
+    }
+    applyTocVisibility();
+    if (!collapsed) {
+      requestAnimationFrame(() => updateTocActive(true));
+    }
+  }
+
+  function bindTocEvents() {
+    dom.tocCollapse.addEventListener('click', () => {
+      if (tocIsNarrow()) {
+        tocDrawerOpen = false;
+        applyTocVisibility();
+        return;
+      }
+      setTocCollapsed(true);
+    });
+
+    dom.tocFab.addEventListener('click', () => {
+      if (tocIsNarrow()) {
+        tocDrawerOpen = true;
+        applyTocVisibility();
+        requestAnimationFrame(() => updateTocActive(true));
+        return;
+      }
+      setTocCollapsed(false);
+    });
+
+    dom.tocList.addEventListener('click', (event) => {
+      const link = event.target.closest('.toc-link');
+      if (!link) return;
+      setTocActive(link.dataset.id);
+      if (tocIsNarrow()) {
+        tocDrawerOpen = false;
+        applyTocVisibility();
+      }
+    });
+
+    window.matchMedia('(max-width: 1279px)').addEventListener('change', () => {
+      tocDrawerOpen = false;
+      applyTocVisibility();
+    });
+
+    dom.tocBackdrop.addEventListener('click', () => {
+      if (!tocDrawerOpen || !tocIsNarrow()) return;
+      tocDrawerOpen = false;
+      applyTocVisibility();
+    });
+  }
+
+  /* ---------------------------------------------------------------- */
   /* Theme                                                            */
   /* ---------------------------------------------------------------- */
 
@@ -531,6 +734,7 @@
     dom.landing.hidden = false;
     dom.status.hidden = true;
     dom.doc.hidden = true;
+    clearToc();
     resetMeta();
     document.title = 'Markdown Reader';
     dom.progress.style.width = '0%';
@@ -543,6 +747,7 @@
   function showStatus({ title, text = '', error = false, actions = false }) {
     dom.landing.hidden = true;
     dom.doc.hidden = true;
+    clearToc();
     dom.status.hidden = false;
     dom.statusSpinner.hidden = error;
     dom.statusIcon.hidden = !error;
@@ -947,11 +1152,13 @@
     dom.rawBtn.hidden = false;
     dom.reloadBtn.hidden = false;
     docReady = true;
+    buildToc();
     updateProgress();
 
     const hash = originalUrl.hash;
     renderMermaidBlocks().then(() => {
       if (hash) scrollToHash(hash);
+      updateTocActive(true);
     });
   }
 
@@ -1315,6 +1522,7 @@
     window.addEventListener('resize', queueProgress, { passive: true });
 
     bindLightboxEvents();
+    bindTocEvents();
   }
 
   /* ---------------------------------------------------------------- */
@@ -1323,6 +1531,7 @@
 
   function start() {
     initTheme();
+    initTocPreference();
     bindEvents();
     updateProgress();
 

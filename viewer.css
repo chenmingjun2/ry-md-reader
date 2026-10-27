@@ -85,6 +85,7 @@
 
   --page-w: 880px;
   --topbar-h: 58px;
+  --toc-w: 176px;
 }
 
 [data-theme="dark"] {
@@ -324,6 +325,183 @@ a {
 html[data-theme="light"] .icon-sun,
 html[data-theme="dark"] .icon-moon {
   display: none;
+}
+
+/* ------------------------------------------------------------------ */
+/* Floating table of contents                                         */
+/* ------------------------------------------------------------------ */
+
+.toc {
+  position: fixed;
+  top: calc(var(--topbar-h) + 18px);
+  left: clamp(10px, calc((100vw - var(--page-w)) / 2 - var(--toc-w) - 16px), 2000px);
+  z-index: 25;
+  display: flex;
+  flex-direction: column;
+  width: var(--toc-w);
+  max-height: calc(100dvh - var(--topbar-h) - 36px);
+  padding: 10px 7px 8px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  animation: toc-in 0.18s ease;
+}
+
+@keyframes toc-in {
+  from {
+    opacity: 0;
+    transform: translateX(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.toc-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: 0 0 auto;
+  padding: 0 2px 6px 8px;
+}
+
+.toc-title {
+  color: var(--text-3);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.toc-collapse {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-3);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.toc-collapse:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.toc-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 1px 0;
+  scrollbar-width: thin;
+}
+
+.toc-link {
+  position: relative;
+  display: -webkit-box;
+  padding: 5px 8px;
+  overflow: hidden;
+  border-left: 2px solid transparent;
+  border-radius: 6px;
+  color: var(--text-2);
+  font-size: 11.5px;
+  line-height: 1.5;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.toc-link:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.toc-link.active {
+  border-left-color: var(--brand);
+  border-radius: 0 6px 6px 0;
+  background: var(--brand-soft);
+  color: var(--brand);
+  font-weight: 500;
+}
+
+.toc-link[data-level="2"] {
+  padding-left: 18px;
+}
+
+.toc-link[data-level="3"] {
+  padding-left: 28px;
+}
+
+.toc-link[data-level="4"] {
+  padding-left: 38px;
+}
+
+.toc-link[data-level="5"] {
+  padding-left: 48px;
+}
+
+.toc-link[data-level="6"] {
+  padding-left: 58px;
+}
+
+.toc-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 44;
+  background: rgba(8, 10, 14, 0.18);
+  animation: lightbox-in 0.16s ease;
+}
+
+.toc-fab {
+  position: fixed;
+  top: calc(var(--topbar-h) + 16px);
+  left: 12px;
+  z-index: 25;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 11px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  box-shadow: var(--shadow-sm);
+  color: var(--text-2);
+  font-size: 11.5px;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.toc-fab:hover {
+  border-color: var(--border-strong);
+  background: var(--hover);
+  color: var(--text);
+}
+
+@media (max-width: 1279px) {
+  .toc {
+    top: calc(var(--topbar-h) + 12px);
+    left: 12px;
+    width: min(264px, calc(100vw - 24px));
+    max-height: calc(100dvh - var(--topbar-h) - 24px);
+    z-index: 45;
+    box-shadow: var(--shadow);
+  }
+
+  .toc-fab {
+    top: auto;
+    bottom: 20px;
+    left: 12px;
+    z-index: 45;
+    box-shadow: var(--shadow);
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -1391,6 +1569,9 @@ body.lightbox-open {
   .toast,
   .landing,
   .status,
+  .toc,
+  .toc-fab,
+  .toc-backdrop,
   .code-head {
     display: none !important;
   }
