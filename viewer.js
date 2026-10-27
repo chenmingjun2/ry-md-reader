@@ -501,7 +501,7 @@
   }
 
   function tocIsNarrow() {
-    return window.matchMedia('(max-width: 1279px)').matches;
+    return window.matchMedia('(max-width: 1399px)').matches;
   }
 
   function applyTocVisibility() {
@@ -653,7 +653,7 @@
       }
     });
 
-    window.matchMedia('(max-width: 1279px)').addEventListener('change', () => {
+    window.matchMedia('(max-width: 1399px)').addEventListener('change', () => {
       tocDrawerOpen = false;
       applyTocVisibility();
     });
